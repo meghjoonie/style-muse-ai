@@ -5,6 +5,8 @@ import PromptResult from "@/components/PromptResult";
 import SuggestedStyles from "@/components/SuggestedStyles";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wand2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import heroBg from "@/assets/hero-bg.jpg";
 
 interface PromptData {
@@ -25,6 +27,7 @@ const Index = () => {
   const [, setImageFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<PromptData | null>(null);
+  const { toast } = useToast();
 
   const handleImageSelect = (file: File, preview: string) => {
     setImageFile(file);
@@ -38,26 +41,31 @@ const Index = () => {
     setResult(null);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!imagePreview) return;
     setIsAnalyzing(true);
-    // Simulate AI analysis - will be replaced with real AI once Cloud is enabled
-    setTimeout(() => {
-      setResult({
-        prompt:
-          "Ultra-realistic cinematic portrait, golden hour lighting, warm amber tones, shallow depth of field, 85mm lens, soft diffused shadows, natural skin texture with subtle imperfections, professional color grading with warm highlights, volumetric light rays, high detail, 8K quality, shot on Hasselblad.",
-        negativePrompt:
-          "blurry, low quality, distorted face, extra fingers, bad anatomy, overexposed, watermark, text, logo, cartoon, illustration, painting, drawing, noise, grain, pixelated",
-        tags: ["8K", "ultra realistic", "cinematic", "golden hour", "portrait", "Hasselblad", "high detail"],
-        details: {
-          style: "Cinematic Realism",
-          lighting: "Golden Hour, Warm",
-          mood: "Intimate & Cinematic",
-          composition: "Close-up Portrait",
-          camera: "85mm f/1.4 Hasselblad",
-        },
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-image", {
+        body: { imageBase64: imagePreview },
       });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setResult(data as PromptData);
+    } catch (err: any) {
+      console.error("Analysis failed:", err);
+      toast({
+        title: "Analysis Failed",
+        description: err.message || "Could not analyze the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsAnalyzing(false);
-    }, 2500);
+    }
   };
 
   const handleStyleSelect = (style: any) => {
